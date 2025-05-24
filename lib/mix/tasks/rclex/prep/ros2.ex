@@ -45,7 +45,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
 
   @nerves_target_arch_map %{"rpi4" => "arm64v8", "rpi3" => "arm32v7"}
 
-  @switches [arch: :string]
+  @switches [arch: :string, custom_image: :string]
 
   @doc false
   def run(args) do
@@ -63,6 +63,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
         :arch,
         Map.get(@nerves_target_arch_map, System.get_env("MIX_TARGET"))
       )
+    custom_image = Keyword.get(parsed_args, :custom_image)
 
     if arch not in @supported_arch do
       Mix.raise("""
@@ -90,7 +91,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
     """
 
     if Mix.shell().yes?(String.trim_trailing(message)) do
-      copy_from_docker!(dest_dir_path, arch, ros_distro)
+      copy_from_docker!(dest_dir_path, arch, ros_distro, custom_image)
     end
   end
 
@@ -110,40 +111,40 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
   end
 
   @doc false
-  def copy_from_docker!(dest_dir_path, arch, ros_distro) do
+  def copy_from_docker!(dest_dir_path, arch, ros_distro, custom_image) do
     dest_path = Path.join(dest_dir_path, "/opt/ros/#{ros_distro}")
     create_resources_directory!(dest_path, _git_ignore = true)
-    copy_ros_resources_from_docker!(dest_path, arch, ros_distro)
+    copy_ros_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
 
     dest_path = Path.join(dest_dir_path, "/opt/ros/#{ros_distro}/lib")
     create_resources_directory!(dest_path, _git_ignore = false)
-    copy_vendor_resources_from_docker!(dest_path, arch, ros_distro)
+    copy_vendor_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
   end
 
-  defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro)
+  defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
        when arch in ["arm64v8", "amd64"] do
     [
       "/opt/ros/#{ros_distro}/include",
       "/opt/ros/#{ros_distro}/lib",
       "/opt/ros/#{ros_distro}/share"
     ]
-    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) end)
+    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
 
-  defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro)
+  defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
        when arch in ["arm32v7"] do
     [
       "/root/ros2_ws/install/*/include",
       "/root/ros2_ws/install/*/lib",
       "/root/ros2_ws/install/*/share"
     ]
-    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) end)
+    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
 
   defp copy_vendor_resources_from_docker!(dest_path, arch, ros_distro)
        when arch in ["arm64v8", "amd64", "arm32v7"] do
     vendor_resources(arch, ros_distro)
-    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) end)
+    |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
 
   defp vendor_resources(arch, ros_distro) when ros_distro in ["humble", "jazzy"] do
@@ -164,7 +165,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
 
   defp copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) do
     with true <- File.exists?(dest_path) do
-      docker_tag = ros_docker_image_tag(arch, ros_distro)
+      docker_tag = custom_image || ros_docker_image_tag(arch, ros_distro)
       docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", "--platform", @docker_platform[arch], docker_tag] |> IO.inspect(label: "Docker command")
       copy_command = ["bash", "-c", "for s in #{src_path}; do cp -rf $s /mnt; done"]
 
