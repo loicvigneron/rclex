@@ -7,6 +7,8 @@ ifeq ($(origin ROS_DISTRO), undefined)
 $(error $(ERROR_ROS_DISTRO_NOT_DEFINED))
 endif
 
+ROS_INSTALL_FROM_SOURCE ?= false
+
 ifeq ($(MIX_TARGET), host)
 ROS_DIR ?= /opt/ros/$(ROS_DISTRO)
 else
@@ -27,13 +29,20 @@ ERL_LDFLAGS ?= -L$(ERL_EI_LIBDIR) -lei
 
 ifeq ($(ROS_DISTRO), humble)
 ROS_INCS    ?= rcl rcutils rmw rcl_yaml_param_parser rosidl_runtime_c rosidl_typesupport_interface
-ROS_CFLAGS  ?= $(addprefix -I$(ROS_DIR)/include/, $(ROS_INCS))
 else ifeq ($(ROS_DISTRO), jazzy)
-ROS_INCS    ?= rcl rcutils rmw rcl_yaml_param_parser type_description_interfaces rosidl_runtime_c service_msgs builtin_interfaces rosidl_typesupport_interface rosidl_dynamic_typesupport
-ROS_CFLAGS  ?= $(addprefix -I$(ROS_DIR)/include/, $(ROS_INCS))
+ROS_INCS    ?= rcl rcutils rcl_node_is_valid rmw rcl_yaml_param_parser type_description_interfaces rosidl_runtime_c service_msgs builtin_interfaces rosidl_typesupport_interface rosidl_dynamic_typesupport
 endif
 
+ifeq ($(ROS_INSTALL_FROM_SOURCE),true)
+$(info "ROS installed from source...")
+ROS_CFLAGS  ?= $(foreach pkg,$(ROS_INCS),-I$(ROS_DIR)/$(pkg)/include/$(pkg))
+ROS_LDFLAGS ?= $(foreach pkg,$(ROS_INCS),-L$(ROS_DIR)/$(pkg)/lib)
+else
+$(info "ROS installed from binaries...")
+ROS_CFLAGS  ?= $(addprefix -I$(ROS_DIR)/include/, $(ROS_INCS))
 ROS_LDFLAGS ?= -L$(ROS_DIR)/lib
+endif
+
 ROS_LDFLAGS += -lrcl
 
 SRC_C  = $(wildcard $(SRC_DIR)/*.c)
@@ -46,11 +55,16 @@ ifneq ($(MSG_PKGS), "")
 MSG_PKGS     = $(patsubst src/pkgs/%/msg, %, $(wildcard src/pkgs/*/msg))
 SRC_C       += $(wildcard $(MSG_PKGS:%=src/pkgs/%/msg/*.c))
 MSG_OBJ_DIR  = $(MSG_PKGS:%=$(OBJ_DIR)/pkgs/%/msg)
-ifeq ($(ROS_DISTRO), humble)
-ROS_CFLAGS  += $(addprefix -I$(ROS_DIR)/include/, $(MSG_PKGS))
-else ifeq ($(ROS_DISTRO), jazzy)
+
+ifeq ($(ROS_INSTALL_FROM_SOURCE),true)
+$(info "*ROS installed from source...")
+ROS_CFLAGS  += $(foreach pkg,$(MSG_PKGS),-I$(ROS_DIR)/$(pkg)/include/$(pkg))
+ROS_LDFLAGS += $(foreach pkg,$(MSG_PKGS),-L$(ROS_DIR)/$(pkg)/lib)
+else
+$(info "*ROS installed from binaries...")
 ROS_CFLAGS  += $(addprefix -I$(ROS_DIR)/include/, $(MSG_PKGS))
 endif
+
 ROS_LDFLAGS += $(MSG_PKGS:%=-l%__rosidl_typesupport_c)
 ROS_LDFLAGS += $(MSG_PKGS:%=-l%__rosidl_generator_c)
 endif

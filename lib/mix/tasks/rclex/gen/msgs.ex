@@ -72,6 +72,8 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
   @doc false
   def generate(to) do
     ros_distro = System.get_env("ROS_DISTRO")
+    ros_install_from_source = System.get_env("ROS_INSTALL_FROM_SOURCE") == "true"
+    ros_dir = System.get_env("ROS_DIR")
 
     if is_nil(ros_distro) do
       Mix.raise("Please set ROS_DISTRO.")
@@ -79,7 +81,14 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
 
     ros_directory_path =
       if Mix.target() == :host do
-        "/opt/ros/#{ros_distro}"
+        if ros_install_from_source do
+          if is_nil(ros_dir) do
+            Mix.raise("Please set ROS_DIR.")
+          end
+          ros_dir
+        else
+          "/opt/ros/#{ros_distro}"
+        end
       else
         Path.join(File.cwd!(), "rootfs_overlay/opt/ros/#{ros_distro}")
       end
@@ -88,19 +97,28 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
       Mix.raise("#{ros_directory_path} does not exist.")
     end
 
-    generate(Path.join(ros_directory_path, "share"), to)
+    generate(ros_directory_path, to)
   end
 
   @doc false
   def generate(from, to) do
+    ros_install_from_source = System.get_env("ROS_INSTALL_FROM_SOURCE") == "true"
     types = Application.get_env(:rclex, :ros2_message_types, [])
+
+    from = if Mix.target() == :host && ros_install_from_source do
+      from
+    else
+      Path.join(from, "share")
+    end
 
     if Enum.empty?(types) do
       Mix.raise("ros2_message_types is not specified in config.")
     end
 
     ros2_message_type_map =
-      Enum.reduce(types, %{}, fn type, acc -> get_ros2_message_type_map(type, from, acc) end)
+      Enum.reduce(types, %{}, fn type, acc ->
+        get_ros2_message_type_map(type, from, acc, ros_install_from_source)
+      end)
 
     types = Map.keys(ros2_message_type_map)
 
@@ -211,9 +229,15 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
   end
 
   @doc false
-  def get_ros2_message_type_map(ros2_message_type, from, acc \\ %{}) do
+  def get_ros2_message_type_map(ros2_message_type, from, acc \\ %{}, ros_install_from_source \\ false) do
+    from_type_path = if  Mix.target() == :host && ros_install_from_source do
+      Path.join(from, "#{ros2_message_type |> String.split("/") |> List.first}/share/")
+    else
+      from
+    end
+
     {:ok, fields, _rest, _context, _line, _column} =
-      Path.join(from, [ros2_message_type, ".msg"])
+      Path.join(from_type_path, [ros2_message_type, ".msg"])
       |> File.read!()
       |> MessageParser.parse()
 
@@ -229,10 +253,10 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
           acc
 
         {:msg_type, type} ->
-          get_ros2_message_type_map(type, from, acc)
+          get_ros2_message_type_map(type, from, acc, ros_install_from_source)
 
         {:msg_type_array, type} ->
-          get_ros2_message_type_map(get_array_type(type), from, acc)
+          get_ros2_message_type_map(get_array_type(type), from, acc, ros_install_from_source)
       end
     end)
   end
@@ -241,7 +265,11 @@ defmodule Mix.Tasks.Rclex.Gen.Msgs do
     if Mix.Project.config()[:app] == :rclex do
       File.cwd!()
     else
-      Path.join(File.cwd!(), "deps/rclex")
+      if Mix.Project.config()[:deps][:rclex][:path] != nil do
+        Path.join(File.cwd!(), Mix.Project.config()[:deps][:rclex][:path])
+      else
+        Path.join(File.cwd!(), "deps/rclex")
+      end
     end
   end
 
