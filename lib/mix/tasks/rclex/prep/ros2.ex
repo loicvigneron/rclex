@@ -155,14 +155,16 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
       "/lib/#{dir_name}/libfmt.so*",
       # humble needs OpenSSL 3.x which Nerves doesn't have
       "/lib/#{dir_name}/libssl.so*",
-      "/lib/#{dir_name}/libcrypto.so*"
+      "/lib/#{dir_name}/libcrypto.so*",
+      # jazzy
+      "/lib/#{dir_name}/liblttng-ust*"
     ]
   end
 
   defp copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) do
     with true <- File.exists?(dest_path) do
       docker_tag = ros_docker_image_tag(arch, ros_distro)
-      docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", "--platform", @docker_platform[arch], docker_tag]
+      docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", "--platform", @docker_platform[arch], docker_tag] |> IO.inspect(label: "Docker command")
       copy_command = ["bash", "-c", "for s in #{src_path}; do cp -rf $s /mnt; done"]
 
       {_, 0} = System.cmd("docker", docker_command_args ++ copy_command)
