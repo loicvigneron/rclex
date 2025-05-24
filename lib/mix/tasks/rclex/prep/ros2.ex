@@ -157,7 +157,8 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
       "/lib/#{dir_name}/libssl.so*",
       "/lib/#{dir_name}/libcrypto.so*",
       # jazzy
-      "/lib/#{dir_name}/liblttng-ust*"
+      "/lib/#{dir_name}/liblttng-ust*",
+      "/lib/#{dir_name}/libnuma.so*"
     ]
   end
 
