@@ -28,13 +28,18 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
 
   use Mix.Task
 
-  @arm64v8_ros_distros ["humble"]
-  @amd64_ros_distros ["humble"]
-  @arm32v7_ros_distros ["humble"]
+  @arm64v8_ros_distros ["humble", "jazzy"]
+  @amd64_ros_distros ["humble", "jazzy"]
+  @arm32v7_ros_distros ["humble", "jazzy"]
   @supported_ros_distros %{
     "arm64v8" => @arm64v8_ros_distros,
     "amd64" => @amd64_ros_distros,
     "arm32v7" => @arm32v7_ros_distros
+  }
+  @docker_platform %{
+    "arm64v8" => "linux/arm64/v8",
+    "amd64" => "linux/amd64",
+    "arm32v7" => "linux/arm/v7"
   }
   @supported_arch Map.keys(@supported_ros_distros)
 
@@ -141,7 +146,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
     |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) end)
   end
 
-  defp vendor_resources(arch, "humble") do
+  defp vendor_resources(arch, ros_distro) when ros_distro in ["humble", "jazzy"] do
     dir_name = arch_dir_name(arch)
 
     [
@@ -157,7 +162,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
   defp copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) do
     with true <- File.exists?(dest_path) do
       docker_tag = ros_docker_image_tag(arch, ros_distro)
-      docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", docker_tag]
+      docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", "--platform", @docker_platform[arch], docker_tag]
       copy_command = ["bash", "-c", "for s in #{src_path}; do cp -rf $s /mnt; done"]
 
       {_, 0} = System.cmd("docker", docker_command_args ++ copy_command)
