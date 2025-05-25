@@ -125,9 +125,9 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
   defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
        when arch in ["arm64v8", "amd64"] do
     [
-      "/opt/ros/#{ros_distro}/include/*",
-      "/opt/ros/#{ros_distro}/lib/*",
-      "/opt/ros/#{ros_distro}/share/*"
+      "/opt/ros/#{ros_distro}/include",
+      "/opt/ros/#{ros_distro}/lib",
+      "/opt/ros/#{ros_distro}/share"
     ]
     |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
