@@ -124,9 +124,9 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
   defp copy_ros_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
        when arch in ["arm64v8", "amd64"] do
     [
-      "/opt/ros/#{ros_distro}/include",
-      "/opt/ros/#{ros_distro}/lib",
-      "/opt/ros/#{ros_distro}/share"
+      "/opt/ros/#{ros_distro}/include/*",
+      "/opt/ros/#{ros_distro}/lib/*",
+      "/opt/ros/#{ros_distro}/share/*"
     ]
     |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
@@ -141,7 +141,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
     |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
   end
 
-  defp copy_vendor_resources_from_docker!(dest_path, arch, ros_distro)
+  defp copy_vendor_resources_from_docker!(dest_path, arch, ros_distro, custom_image)
        when arch in ["arm64v8", "amd64", "arm32v7"] do
     vendor_resources(arch, ros_distro)
     |> Enum.map(fn src_path -> copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) end)
@@ -159,11 +159,12 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
       "/lib/#{dir_name}/libcrypto.so*",
       # jazzy
       "/lib/#{dir_name}/liblttng-ust*",
-      "/lib/#{dir_name}/libnuma.so*"
+      "/lib/#{dir_name}/libnuma.so*",
+      "/lib/#{dir_name}/*"
     ]
   end
 
-  defp copy_from_docker_impl!(arch, ros_distro, src_path, dest_path) do
+  defp copy_from_docker_impl!(arch, ros_distro, src_path, dest_path, custom_image) do
     with true <- File.exists?(dest_path) do
       docker_tag = custom_image || ros_docker_image_tag(arch, ros_distro)
       docker_command_args = ["run", "--rm", "-v", "#{dest_path}:/mnt", "--platform", @docker_platform[arch], docker_tag] |> IO.inspect(label: "Docker command")
