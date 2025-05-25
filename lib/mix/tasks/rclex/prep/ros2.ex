@@ -45,7 +45,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
 
   @nerves_target_arch_map %{"rpi4" => "arm64v8", "rpi3" => "arm32v7"}
 
-  @switches [arch: :string, custom_image: :string]
+  @switches [arch: :string, custom_image: :string, target: :string]
 
   @doc false
   def run(args) do
@@ -64,6 +64,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
         Map.get(@nerves_target_arch_map, System.get_env("MIX_TARGET"))
       )
     custom_image = Keyword.get(parsed_args, :custom_image)
+    target = Keyword.get(parsed_args, :target)
 
     if arch not in @supported_arch do
       Mix.raise("""
@@ -83,7 +84,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
     end
 
     # NOTE: If you implement the copy destination option, pass the path here.
-    dest_dir_path = copy_dest_dir_path(arch, ros_distro)
+    dest_dir_path = copy_dest_dir_path(arch, ros_distro, target)
 
     message = """
     Are you sure to copy ROS 2 resources to following directory?
@@ -159,8 +160,7 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
       "/lib/#{dir_name}/libcrypto.so*",
       # jazzy
       "/lib/#{dir_name}/liblttng-ust*",
-      "/lib/#{dir_name}/libnuma.so*",
-      "/lib/#{dir_name}/*"
+      "/lib/#{dir_name}/libnuma.so*"
     ]
   end
 
@@ -211,8 +211,8 @@ defmodule Mix.Tasks.Rclex.Prep.Ros2 do
     end
   end
 
-  defp copy_dest_dir_path(path \\ File.cwd!(), arch, ros_distro) do
-    if Mix.target() == :host do
+  defp copy_dest_dir_path(path \\ File.cwd!(), arch, ros_distro, target) do
+    if target == "host" do
       Path.join(path, ".ros2/resources/from-docker/#{arch}/#{ros_distro}")
     else
       Path.join(path, "rootfs_overlay")
